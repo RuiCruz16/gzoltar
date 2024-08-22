@@ -43,9 +43,9 @@ All notable changes will be documented in this file.
 
 - Fault localization report
   - families: spectrum-based fault localization (sfl)
-    - formulas: Anderberg, Barinel, DStar, Ideal, Jaccard, Kulczynski2, Naish1,
-    Ochiai, Ochiai2, Opt, RogersTanimoto, RusselRao, SBI, SimpleMatching,
-    SorensenDice, Tarantula
+    - formulas: Ample, Anderberg, Barinel, DStar, GP02, Ideal, Jaccard, Kulczynski2, Muse, Naish1,
+    Ochiai, Ochiai2, Opt, PiatetskyShapiro, RogersTanimoto, RusselRao, SBI, SimpleMatching,
+    SorensenDice, Tarantula, Zoltar
   - format
     - txt - simple text-based fault localization report
     - html - three different html-based fault localization report
