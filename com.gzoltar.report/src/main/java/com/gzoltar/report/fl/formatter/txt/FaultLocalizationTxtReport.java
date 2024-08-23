@@ -19,16 +19,15 @@ package com.gzoltar.report.fl.formatter.txt;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+
 import com.gzoltar.core.model.Node;
 import com.gzoltar.core.model.Transaction;
 import com.gzoltar.core.model.TransactionOutcome;
 import com.gzoltar.core.runtime.Probe;
 import com.gzoltar.core.runtime.ProbeGroup;
 import com.gzoltar.core.spectrum.ISpectrum;
+import com.gzoltar.core.util.SuspiciousnessRange;
 import com.gzoltar.fl.IFormula;
 import com.gzoltar.report.fl.formatter.IFaultLocalizationReportFormatter;
 
@@ -41,6 +40,8 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
   private final static String RANKING_EXTENSION_NAME = ".ranking.csv";
 
   private final static String TESTS_FILES_NAME = "tests.csv";
+
+  private final static String NORMALIZATION_FILES_NAME = "normalization.csv";
 
   /**
    * {@inheritDoc}
@@ -111,7 +112,11 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
      */
 
     List<Node> nodes = new ArrayList<Node>(spectrum.getNodes());
+    Map<String, SuspiciousnessRange> formulaSuspiciousnessRanges = new HashMap<>();
+
     for (final IFormula formula : formulas) {
+
+      SuspiciousnessRange suspiciousnessRange = new SuspiciousnessRange(Double.MAX_VALUE, Double.NEGATIVE_INFINITY);
 
       PrintWriter formulaWriter = new PrintWriter(outputDirectory + File.separator
           + formula.getName().toLowerCase() + RANKING_EXTENSION_NAME, "UTF-8");
@@ -129,11 +134,15 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       });
 
       for (Node node : nodes) {
+        suspiciousnessRange.updateRange(node.getSuspiciousnessValue(formula.getName()));
+
         formulaWriter.println(
             node.getNameWithLineNumber() + ";" + node.getSuspiciousnessValue(formula.getName()));
       }
 
       formulaWriter.close();
+
+      formulaSuspiciousnessRanges.put(formula.getName(), suspiciousnessRange);
     }
 
     /**
@@ -155,5 +164,37 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
     }
 
     testsWriter.close();
+
+    /**
+     * Print 'normalization'
+     */
+
+    PrintWriter normalizationWriter =
+            new PrintWriter(outputDirectory + File.separator + NORMALIZATION_FILES_NAME, "UTF-8");
+
+    normalizationWriter.println("name;formula;normalized_value");
+
+    for (Map.Entry<String, SuspiciousnessRange> entry : formulaSuspiciousnessRanges.entrySet()) {
+      String formulaName = entry.getKey();
+      SuspiciousnessRange range = entry.getValue();
+      double minSuspiciousnessVal = range.getMinValue();
+      double maxSuspiciousnessVal = range.getMaxValue();
+
+      for (Node node : nodes) {
+        double suspiciousnessValue = node.getSuspiciousnessValue(formulaName);
+
+        double normalizedValue;
+        if (maxSuspiciousnessVal == minSuspiciousnessVal) {
+          normalizedValue = 0.0;
+        } else {
+          normalizedValue = (suspiciousnessValue - minSuspiciousnessVal) /
+                  (maxSuspiciousnessVal - minSuspiciousnessVal);
+        }
+
+        normalizationWriter.println(node.getNameWithLineNumber() + ";" + formulaName + ";" + normalizedValue);
+      }
+    }
+
+    normalizationWriter.close();
   }
 }

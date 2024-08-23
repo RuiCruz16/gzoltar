@@ -187,7 +187,7 @@ java -cp $BUILD_DIR:$JUNIT_JAR:$HAMCREST_JAR:$GZOLTAR_CLI_JAR \
     --dataFile "$SER_FILE" \
     --outputDirectory "$BUILD_DIR" \
     --family "sfl" \
-    --formula "ochiai" \
+    --formula "zoltar:ample:muse" \
     --metric "entropy" \
     --formatter "txt" || die "Generation of fault-localization report has failed!"
 
