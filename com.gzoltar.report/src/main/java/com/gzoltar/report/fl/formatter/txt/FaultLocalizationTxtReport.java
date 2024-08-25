@@ -27,6 +27,7 @@ import com.gzoltar.core.model.TransactionOutcome;
 import com.gzoltar.core.runtime.Probe;
 import com.gzoltar.core.runtime.ProbeGroup;
 import com.gzoltar.core.spectrum.ISpectrum;
+import com.gzoltar.core.util.NormalizationSaver;
 import com.gzoltar.core.util.SuspiciousnessRange;
 import com.gzoltar.fl.IFormula;
 import com.gzoltar.report.fl.formatter.IFaultLocalizationReportFormatter;
@@ -41,7 +42,7 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
 
   private final static String TESTS_FILES_NAME = "tests.csv";
 
-  private final static String NORMALIZATION_FILES_NAME = "normalization.csv";
+  private final static String VALS_FILES_NAME = "newvals.csv";
 
   /**
    * {@inheritDoc}
@@ -143,7 +144,12 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       formulaWriter.close();
 
       formulaSuspiciousnessRanges.put(formula.getName(), suspiciousnessRange);
+      //System.out.println("Max: " + suspiciousnessRange.getMaxValue() + " Min: " + suspiciousnessRange.getMinValue() + " Formula: " + formula.getName());
     }
+
+    NormalizationSaver normalizationSaver = new NormalizationSaver();
+
+    normalizationSaver.normalizeAndSaveValues(formulaSuspiciousnessRanges, nodes);
 
     /**
      * Print 'tests'
@@ -166,35 +172,52 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
     testsWriter.close();
 
     /**
-     * Print 'normalization'
+     * Print 'newvals'
      */
 
-    PrintWriter normalizationWriter =
-            new PrintWriter(outputDirectory + File.separator + NORMALIZATION_FILES_NAME, "UTF-8");
+    PrintWriter newValWriter = new PrintWriter(outputDirectory + File.separator + VALS_FILES_NAME, "UTF-8");
 
-    normalizationWriter.println("name;formula;normalized_value");
+    newValWriter.println("linenumber;suspiciousness_value");
 
-    for (Map.Entry<String, SuspiciousnessRange> entry : formulaSuspiciousnessRanges.entrySet()) {
-      String formulaName = entry.getKey();
-      SuspiciousnessRange range = entry.getValue();
-      double minSuspiciousnessVal = range.getMinValue();
-      double maxSuspiciousnessVal = range.getMaxValue();
+    Map<Integer, List<Double>> normalizedValues = normalizationSaver.getNormalizedValuesMap();
 
-      for (Node node : nodes) {
-        double suspiciousnessValue = node.getSuspiciousnessValue(formulaName);
+    for (Map.Entry<Integer, List<Double>> entry : normalizedValues.entrySet()) {
+      Integer lineNumber = entry.getKey();
+      List<Double> values = entry.getValue();
+      double m1 = values.get(0);
+      double m2 = values.get(1);
+      double m3 = values.get(2);
+      System.out.println("Line " + lineNumber + ": m1 = " + m1 + ", m2 = " + m2 + ", m3 = " + m3);
 
-        double normalizedValue;
-        if (maxSuspiciousnessVal == minSuspiciousnessVal) {
-          normalizedValue = 0.0;
-        } else {
-          normalizedValue = (suspiciousnessValue - minSuspiciousnessVal) /
-                  (maxSuspiciousnessVal - minSuspiciousnessVal);
-        }
+      double K1 = m1 * (1 - m2) + (1 - m1) * m2;
+      System.out.println("Calculated K1: " + K1);
+      double m12, m12neg;
 
-        normalizationWriter.println(node.getNameWithLineNumber() + ";" + formulaName + ";" + normalizedValue);
+      if (1 - K1 == 0) {
+        m12 = 0.0;
+        m12neg = 0.0;
+      } else {
+        m12 = (m1 * m2) / (1 - K1);
+        m12neg = ((1 - m1) * (1 - m2)) / (1 - K1);
       }
-    }
 
-    normalizationWriter.close();
+      System.out.println("Calculated m12: " + m12);
+      System.out.println("Calculated m12neg: " + m12neg);
+
+      double K2 = m12 * (1 - m3) + m12neg * m3;
+      System.out.println("Calculated K2: " + K2);
+      double m123;
+
+      if (1 - K2 == 0) {
+        m123 = 0.0;
+      } else {
+        m123 = (m12 * m3) / (1 - K2);
+      }
+
+      System.out.println("Calculated m123: " + m123);
+      newValWriter.println("line_" + lineNumber + ";" + m123);
+    }
+    newValWriter.close();
+
   }
 }
