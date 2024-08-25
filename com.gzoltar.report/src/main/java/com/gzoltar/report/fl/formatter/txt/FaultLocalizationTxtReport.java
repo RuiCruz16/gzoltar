@@ -180,6 +180,8 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
     newValWriter.println("linenumber;suspiciousness_value");
 
     Map<Integer, List<Double>> normalizedValues = normalizationSaver.getNormalizedValuesMap();
+    Map<Integer, Double> DempsterRes = new TreeMap<>();
+    int window_size = 1;
 
     for (Map.Entry<Integer, List<Double>> entry : normalizedValues.entrySet()) {
       Integer lineNumber = entry.getKey();
@@ -187,10 +189,10 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       double m1 = values.get(0);
       double m2 = values.get(1);
       double m3 = values.get(2);
-      System.out.println("Line " + lineNumber + ": m1 = " + m1 + ", m2 = " + m2 + ", m3 = " + m3);
+      //System.out.println("Line " + lineNumber + ": m1 = " + m1 + ", m2 = " + m2 + ", m3 = " + m3);
 
       double K1 = m1 * (1 - m2) + (1 - m1) * m2;
-      System.out.println("Calculated K1: " + K1);
+      //System.out.println("Calculated K1: " + K1);
       double m12, m12neg;
 
       if (1 - K1 == 0) {
@@ -201,11 +203,11 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
         m12neg = ((1 - m1) * (1 - m2)) / (1 - K1);
       }
 
-      System.out.println("Calculated m12: " + m12);
-      System.out.println("Calculated m12neg: " + m12neg);
+      //System.out.println("Calculated m12: " + m12);
+      //System.out.println("Calculated m12neg: " + m12neg);
 
       double K2 = m12 * (1 - m3) + m12neg * m3;
-      System.out.println("Calculated K2: " + K2);
+      //System.out.println("Calculated K2: " + K2);
       double m123;
 
       if (1 - K2 == 0) {
@@ -214,8 +216,24 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
         m123 = (m12 * m3) / (1 - K2);
       }
 
-      System.out.println("Calculated m123: " + m123);
-      newValWriter.println("line_" + lineNumber + ";" + m123);
+      //System.out.println("Calculated m123: " + m123);
+      DempsterRes.put(lineNumber, m123);
+    }
+
+    for (Integer lineNumber : DempsterRes.keySet()) {
+      double sum = 0.0;
+      int count = 0;
+
+      for (int i = -window_size; i <= window_size; i++) {
+        int currentLine = lineNumber + i;
+        if (DempsterRes.containsKey(currentLine)) {
+          sum += DempsterRes.get(currentLine);
+          count++;
+        }
+      }
+
+      double fuzzyValue = sum / count;
+      newValWriter.println("line_" + lineNumber + ";" + fuzzyValue);
     }
     newValWriter.close();
 
