@@ -18,35 +18,36 @@ package com.gzoltar.core.util;
 
 import com.gzoltar.core.model.Node;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public final class NormalizationSaver {
-    private Map<Integer, List<Double>> normalizedValuesMap = new HashMap<>();
+    private Map<Integer, List<Double>> normalizedValuesMap = new TreeMap<>();
 
-    public void normalizeAndSaveValues(Map<String, SuspiciousnessRange> formulaSuspiciousnessRanges, List<Node> nodes) {
-        for (Map.Entry<String, SuspiciousnessRange> entry : formulaSuspiciousnessRanges.entrySet()) {
-            String formulaName = entry.getKey();
-            SuspiciousnessRange range = entry.getValue();
-            double minSuspiciousnessVal = range.getMinValue();
-            double maxSuspiciousnessVal = range.getMaxValue();
+    public void normalizeAndSaveValues(Map<Integer, SuspiciousnessRange> formulaSuspiciousnessRanges, Map<Integer, double[]> fuzzySuspiciousness) {
+        for (Map.Entry<Integer, double[]> entry : fuzzySuspiciousness.entrySet()) {
+            Integer lineNumber = entry.getKey();
+            double[] fuzzyValues = entry.getValue();
 
-            for (Node node : nodes) {
-                double suspiciousnessValue = node.getSuspiciousnessValue(formulaName);
+            List<Double> normalizedValues = new ArrayList<>();
 
+            for (int formulaIndex = 0; formulaIndex < fuzzyValues.length; formulaIndex++) {
+                SuspiciousnessRange range = formulaSuspiciousnessRanges.get(formulaIndex);
+                double minSuspiciousnessVal = range.getMinValue();
+                double maxSuspiciousnessVal = range.getMaxValue();
+
+                double fuzzyValue = fuzzyValues[formulaIndex];
                 double normalizedValue;
+
                 if (maxSuspiciousnessVal == minSuspiciousnessVal) {
                     normalizedValue = 0.0;
                 } else {
-                    normalizedValue = (suspiciousnessValue - minSuspiciousnessVal) /
-                            (maxSuspiciousnessVal - minSuspiciousnessVal);
+                    normalizedValue = (fuzzyValue - minSuspiciousnessVal) / (maxSuspiciousnessVal - minSuspiciousnessVal);
                 }
 
-                int lineNumber = node.getLineNumber();
-                normalizedValuesMap.computeIfAbsent(lineNumber, k -> new ArrayList<>()).add(normalizedValue);
+                normalizedValues.add(normalizedValue);
             }
+
+            normalizedValuesMap.put(lineNumber, normalizedValues);
         }
     }
 
@@ -54,3 +55,4 @@ public final class NormalizationSaver {
         return normalizedValuesMap;
     }
 }
+

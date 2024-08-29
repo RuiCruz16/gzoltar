@@ -16,20 +16,17 @@
  */
 package com.gzoltar.core.util;
 
-public final class SuspiciousnessRange {
-    private double minValue;
-    private double maxValue;
+public final class EvidenceCombination {
+    public double calculateDempster(double m1, double m2) {
+        double K = m1 * (1 - m2) + (1 - m1) * m2;
 
-    public SuspiciousnessRange(double minValue, double maxValue) {
-        this.minValue = minValue;
-        this.maxValue = maxValue;
-    }
+        double m12;
+        if (1 - K == 0) {
+            m12 = 0.0;
+        } else {
+            m12 = (m1 * m2) / (1 - K);
+        }
 
-    public double getMinValue() {
-        return minValue;
-    }
-
-    public double getMaxValue() {
-        return maxValue;
+        return m12;
     }
 }

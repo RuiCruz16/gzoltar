@@ -27,6 +27,7 @@ import com.gzoltar.core.model.TransactionOutcome;
 import com.gzoltar.core.runtime.Probe;
 import com.gzoltar.core.runtime.ProbeGroup;
 import com.gzoltar.core.spectrum.ISpectrum;
+import com.gzoltar.core.util.EvidenceCombination;
 import com.gzoltar.core.util.NormalizationSaver;
 import com.gzoltar.core.util.SuspiciousnessRange;
 import com.gzoltar.fl.IFormula;
@@ -42,7 +43,7 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
 
   private final static String TESTS_FILES_NAME = "tests.csv";
 
-  private final static String VALS_FILES_NAME = "newvals.csv";
+  private final static String RES_FILES_NAME = "results.csv";
 
   /**
    * {@inheritDoc}
@@ -113,11 +114,9 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
      */
 
     List<Node> nodes = new ArrayList<Node>(spectrum.getNodes());
-    Map<String, SuspiciousnessRange> formulaSuspiciousnessRanges = new HashMap<>();
+
 
     for (final IFormula formula : formulas) {
-
-      SuspiciousnessRange suspiciousnessRange = new SuspiciousnessRange(Double.MAX_VALUE, Double.NEGATIVE_INFINITY);
 
       PrintWriter formulaWriter = new PrintWriter(outputDirectory + File.separator
           + formula.getName().toLowerCase() + RANKING_EXTENSION_NAME, "UTF-8");
@@ -135,21 +134,12 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       });
 
       for (Node node : nodes) {
-        suspiciousnessRange.updateRange(node.getSuspiciousnessValue(formula.getName()));
-
         formulaWriter.println(
             node.getNameWithLineNumber() + ";" + node.getSuspiciousnessValue(formula.getName()));
       }
 
       formulaWriter.close();
-
-      formulaSuspiciousnessRanges.put(formula.getName(), suspiciousnessRange);
-      //System.out.println("Max: " + suspiciousnessRange.getMaxValue() + " Min: " + suspiciousnessRange.getMinValue() + " Formula: " + formula.getName());
     }
-
-    NormalizationSaver normalizationSaver = new NormalizationSaver();
-
-    normalizationSaver.normalizeAndSaveValues(formulaSuspiciousnessRanges, nodes);
 
     /**
      * Print 'tests'
@@ -170,18 +160,14 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
     }
 
     testsWriter.close();
-
-    /**
-     * Print 'newvals'
-     */
+    /*
 
     PrintWriter newValWriter = new PrintWriter(outputDirectory + File.separator + VALS_FILES_NAME, "UTF-8");
 
     newValWriter.println("linenumber;suspiciousness_value");
-
+    NormalizationSaver normalizationSaver = new NormalizationSaver();
     Map<Integer, List<Double>> normalizedValues = normalizationSaver.getNormalizedValuesMap();
     Map<Integer, Double> DempsterRes = new TreeMap<>();
-    int window_size = 1;
 
     for (Map.Entry<Integer, List<Double>> entry : normalizedValues.entrySet()) {
       Integer lineNumber = entry.getKey();
@@ -189,34 +175,10 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       double m1 = values.get(0);
       double m2 = values.get(1);
       double m3 = values.get(2);
-      //System.out.println("Line " + lineNumber + ": m1 = " + m1 + ", m2 = " + m2 + ", m3 = " + m3);
 
-      double K1 = m1 * (1 - m2) + (1 - m1) * m2;
-      //System.out.println("Calculated K1: " + K1);
-      double m12, m12neg;
+      double m12 = new EvidenceCombination().calculateDempster(m1, m2);
+      double m123 = new EvidenceCombination().calculateDempster(m12, m3);
 
-      if (1 - K1 == 0) {
-        m12 = 0.0;
-        m12neg = 0.0;
-      } else {
-        m12 = (m1 * m2) / (1 - K1);
-        m12neg = ((1 - m1) * (1 - m2)) / (1 - K1);
-      }
-
-      //System.out.println("Calculated m12: " + m12);
-      //System.out.println("Calculated m12neg: " + m12neg);
-
-      double K2 = m12 * (1 - m3) + m12neg * m3;
-      //System.out.println("Calculated K2: " + K2);
-      double m123;
-
-      if (1 - K2 == 0) {
-        m123 = 0.0;
-      } else {
-        m123 = (m12 * m3) / (1 - K2);
-      }
-
-      //System.out.println("Calculated m123: " + m123);
       DempsterRes.put(lineNumber, m123);
     }
 
@@ -237,5 +199,79 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
     }
     newValWriter.close();
 
+     */
+
+    /**
+     * Print 'results'
+     */
+
+    PrintWriter resultsWriter = new PrintWriter(outputDirectory + File.separator + RES_FILES_NAME, "UTF-8");
+    resultsWriter.println("name;suspiciousness_value");
+
+    Map<Integer, double[]> fuzzySuspiciousness = new TreeMap<>();
+    Map<Integer, SuspiciousnessRange> formulaSuspiciousnessRanges = new HashMap<>();
+    NormalizationSaver normalizationSaver = new NormalizationSaver();
+
+    int formulaIndex = 0;
+    int window_size = 4;
+
+    for (final IFormula formula : formulas) {
+      Map<Integer, Double> originalSuspiciousness = new TreeMap<>();
+
+      for (Node node : nodes) {
+        originalSuspiciousness.put(node.getLineNumber(), node.getSuspiciousnessValue(formula.getName()));
+      }
+      System.out.println("originalSuspiciousness: " + originalSuspiciousness);
+
+      double minFuzzyValue = Double.MAX_VALUE;
+      double maxFuzzyValue = Double.MIN_VALUE;
+
+      for (Integer lineNumber : originalSuspiciousness.keySet()) {
+        double sum = 0.0;
+        int count = 0;
+
+        for (int i = -window_size; i <= window_size; i++) {
+          int currentLine = lineNumber + i;
+          if (originalSuspiciousness.containsKey(currentLine)) {
+            sum += originalSuspiciousness.get(currentLine);
+            count++;
+          }
+        }
+
+        double fuzzyValue = sum / count;
+
+        if (fuzzyValue < minFuzzyValue) {
+          minFuzzyValue = fuzzyValue;
+        }
+        if (fuzzyValue > maxFuzzyValue) {
+          maxFuzzyValue = fuzzyValue;
+        }
+
+        double[] fuzzyValues = fuzzySuspiciousness.getOrDefault(lineNumber, new double[3]);
+        fuzzyValues[formulaIndex] = fuzzyValue;
+        fuzzySuspiciousness.put(lineNumber, fuzzyValues);
+      }
+
+      formulaSuspiciousnessRanges.put(formulaIndex, new SuspiciousnessRange(minFuzzyValue, maxFuzzyValue));
+      formulaIndex++;
+    }
+
+    normalizationSaver.normalizeAndSaveValues(formulaSuspiciousnessRanges, fuzzySuspiciousness);
+    Map<Integer, List<Double>> normalizedValues = normalizationSaver.getNormalizedValuesMap();
+
+    for (Map.Entry<Integer, List<Double>> entry : normalizedValues.entrySet()) {
+      Integer lineNumber = entry.getKey();
+      List<Double> values = entry.getValue();
+      double m1 = values.get(0);
+      double m2 = values.get(1);
+      double m3 = values.get(2);
+
+      double m12 = new EvidenceCombination().calculateDempster(m1, m2);
+      double m123 = new EvidenceCombination().calculateDempster(m12, m3);
+
+        resultsWriter.println("line_" + lineNumber + ";" + m123);
+    }
+
+    resultsWriter.close();
   }
 }
