@@ -43,7 +43,7 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
 
   private final static String TESTS_FILES_NAME = "tests.csv";
 
-  private final static String RES_FILES_NAME = "results.csv";
+  private final static String RES_FILES_NAME = "fuzzy.res.csv";
 
   /**
    * {@inheritDoc}
@@ -160,49 +160,9 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
     }
 
     testsWriter.close();
-    /*
-
-    PrintWriter newValWriter = new PrintWriter(outputDirectory + File.separator + VALS_FILES_NAME, "UTF-8");
-
-    newValWriter.println("linenumber;suspiciousness_value");
-    NormalizationSaver normalizationSaver = new NormalizationSaver();
-    Map<Integer, List<Double>> normalizedValues = normalizationSaver.getNormalizedValuesMap();
-    Map<Integer, Double> DempsterRes = new TreeMap<>();
-
-    for (Map.Entry<Integer, List<Double>> entry : normalizedValues.entrySet()) {
-      Integer lineNumber = entry.getKey();
-      List<Double> values = entry.getValue();
-      double m1 = values.get(0);
-      double m2 = values.get(1);
-      double m3 = values.get(2);
-
-      double m12 = new EvidenceCombination().calculateDempster(m1, m2);
-      double m123 = new EvidenceCombination().calculateDempster(m12, m3);
-
-      DempsterRes.put(lineNumber, m123);
-    }
-
-    for (Integer lineNumber : DempsterRes.keySet()) {
-      double sum = 0.0;
-      int count = 0;
-
-      for (int i = -window_size; i <= window_size; i++) {
-        int currentLine = lineNumber + i;
-        if (DempsterRes.containsKey(currentLine)) {
-          sum += DempsterRes.get(currentLine);
-          count++;
-        }
-      }
-
-      double fuzzyValue = sum / count;
-      newValWriter.println("line_" + lineNumber + ";" + fuzzyValue);
-    }
-    newValWriter.close();
-
-     */
 
     /**
-     * Print 'results'
+     * Print 'fuzzy.res'
      */
 
     PrintWriter resultsWriter = new PrintWriter(outputDirectory + File.separator + RES_FILES_NAME, "UTF-8");
@@ -213,7 +173,7 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
     NormalizationSaver normalizationSaver = new NormalizationSaver();
 
     int formulaIndex = 0;
-    int window_size = 4;
+    int window_size = 3;
 
     for (final IFormula formula : formulas) {
       Map<Integer, Double> originalSuspiciousness = new TreeMap<>();
@@ -221,7 +181,7 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       for (Node node : nodes) {
         originalSuspiciousness.put(node.getLineNumber(), node.getSuspiciousnessValue(formula.getName()));
       }
-      System.out.println("originalSuspiciousness: " + originalSuspiciousness);
+      //System.out.println("originalSuspiciousness: " + originalSuspiciousness);
 
       double minFuzzyValue = Double.MAX_VALUE;
       double maxFuzzyValue = Double.MIN_VALUE;
@@ -247,17 +207,24 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
           maxFuzzyValue = fuzzyValue;
         }
 
-        double[] fuzzyValues = fuzzySuspiciousness.getOrDefault(lineNumber, new double[3]);
+        double[] fuzzyValues = fuzzySuspiciousness.computeIfAbsent(lineNumber, k -> new double[3]);
         fuzzyValues[formulaIndex] = fuzzyValue;
+
+        //System.out.println("Line Number: " + lineNumber);
+        //System.out.println("Fuzzy Value: " + fuzzyValue);
+        //System.out.println("Fuzzy Values Array: " + Arrays.toString(fuzzyValues));
+
         fuzzySuspiciousness.put(lineNumber, fuzzyValues);
       }
 
       formulaSuspiciousnessRanges.put(formulaIndex, new SuspiciousnessRange(minFuzzyValue, maxFuzzyValue));
+      //System.out.println("formula index: " + formulaIndex + " minFuzzyValue: " + minFuzzyValue + " maxFuzzyValue: " + maxFuzzyValue);
       formulaIndex++;
     }
 
     normalizationSaver.normalizeAndSaveValues(formulaSuspiciousnessRanges, fuzzySuspiciousness);
     Map<Integer, List<Double>> normalizedValues = normalizationSaver.getNormalizedValuesMap();
+    //System.out.println("normalizedValues: " + normalizedValues.toString());
 
     for (Map.Entry<Integer, List<Double>> entry : normalizedValues.entrySet()) {
       Integer lineNumber = entry.getKey();
@@ -265,11 +232,14 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       double m1 = values.get(0);
       double m2 = values.get(1);
       double m3 = values.get(2);
+      System.out.println("m1: " + m1 + " m2: " + m2 + " m3: " + m3);
 
       double m12 = new EvidenceCombination().calculateDempster(m1, m2);
+      System.out.println("m12: " + m12);
       double m123 = new EvidenceCombination().calculateDempster(m12, m3);
+      System.out.println("m123: " + m123);
 
-        resultsWriter.println("line_" + lineNumber + ";" + m123);
+      resultsWriter.println("line_" + lineNumber + ";" + m123);
     }
 
     resultsWriter.close();
