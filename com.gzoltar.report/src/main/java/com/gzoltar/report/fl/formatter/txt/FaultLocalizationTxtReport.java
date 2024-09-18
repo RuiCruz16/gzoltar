@@ -165,6 +165,8 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
      * Print 'fuzzy.res'
      */
 
+    // Temporary method to calculate fuzzy suspiciousness values, still needs some fixes and to be modeled as a class
+
     PrintWriter resultsWriter = new PrintWriter(outputDirectory + File.separator + RES_FILES_NAME, "UTF-8");
     resultsWriter.println("name;suspiciousness_value");
 
@@ -234,9 +236,11 @@ public class FaultLocalizationTxtReport implements IFaultLocalizationReportForma
       double m3 = values.get(2);
       System.out.println("m1: " + m1 + " m2: " + m2 + " m3: " + m3);
 
-      double m12 = new EvidenceCombination().calculateDempster(m1, m2);
+      EvidenceCombination evidenceCombination = new EvidenceCombination();
+
+      double m12 = evidenceCombination.calculateDempster(m1, m2);
       System.out.println("m12: " + m12);
-      double m123 = new EvidenceCombination().calculateDempster(m12, m3);
+      double m123 = evidenceCombination.calculateDempster(m12, m3);
       System.out.println("m123: " + m123);
 
       resultsWriter.println("line_" + lineNumber + ";" + m123);
